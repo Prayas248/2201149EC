@@ -128,10 +128,9 @@ json
 The application requires the following environment variables:
 
 
-TEST_SERVER_URL=http://api-base-url
+AUTH_URL=http://20.244.56.144/test/auth
+BASE_URL=http://20.244.56.144/test
 PORT=3002
-CACHE_TTL_USERS=300
-CACHE_TTL_POSTS=120
 COMPANY_NAME=yourCompany
 CLIENT_ID=yourClientId
 CLIENT_SECRET=yourClientSecret
