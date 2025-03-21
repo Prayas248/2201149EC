@@ -146,7 +146,6 @@ bash
 npm install
 
 # Start the server
-npm start
+node index.js
 
-# Development mode with auto-restart
-npm run dev
+
