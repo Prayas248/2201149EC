@@ -1,21 +1,22 @@
+require('dotenv').config();  // Load environment variables
 const express = require('express');
 const axios = require('axios');
 const fs = require('fs');
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 const HEAP_FILE = 'heap.json';
 const POPULAR_POSTS_FILE = 'popular_posts.json';
 
-const AUTH_URL = 'http://20.244.56.144/test/auth';
+const AUTH_URL = process.env.AUTH_URL;
 const CLIENT_DETAILS = {
-    companyName: "goMart",
-    clientID: "91e67f42-adc0-4a01-b573-b67e3b120ff3",
-    clientSecret: "hgWatSsDRiXVgOOQ",
-    ownerName: "Prayas Yadav",
-    ownerEmail: "prayas.2201149ec@iiitbh.ac.in",
-    rollNo: "2201149EC"
+    companyName: process.env.COMPANY_NAME,
+    clientID: process.env.CLIENT_ID,
+    clientSecret: process.env.CLIENT_SECRET,
+    ownerName: process.env.OWNER_NAME,
+    ownerEmail: process.env.OWNER_EMAIL,
+    rollNo: process.env.ROLL_NO
 };
 
 let accessToken = null;
@@ -42,7 +43,6 @@ async function getValidToken() {
     return accessToken;
 }
 
-
 class MaxHeap {
     constructor() {
         this.heap = [];
@@ -51,7 +51,7 @@ class MaxHeap {
 
     insert(item) {
         if (!this.idSet.has(item.id)) {
-            item.fetchTime = Date.now(); 
+            item.fetchTime = Date.now();
             this.heap.push(item);
             this.idSet.add(item.id);
             this.bubbleUp(this.heap.length - 1);
@@ -71,7 +71,7 @@ class MaxHeap {
 
     getTopN(n) {
         return [...this.heap]
-            .sort((a, b) => b.value - a.value) 
+            .sort((a, b) => b.value - a.value)
             .slice(0, n);
     }
 
@@ -117,7 +117,7 @@ postHeap.loadFromFile(POPULAR_POSTS_FILE);
 async function fetchUsers(token) {
     try {
         console.log("Fetching users...");
-        const userResponse = await axios.get('http://20.244.56.144/test/users', {
+        const userResponse = await axios.get(`${process.env.BASE_URL}/users`, {
             headers: { Authorization: `Bearer ${token}` }
         });
 
@@ -130,13 +130,13 @@ async function fetchUsers(token) {
 
         for (const userId in users) {
             console.log(`Fetching posts for user ${userId}...`);
-            const postResponse = await axios.get(`http://20.244.56.144/test/users/${userId}/posts`, {
+            const postResponse = await axios.get(`${process.env.BASE_URL}/users/${userId}/posts`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
             if (!postResponse.data || !postResponse.data.posts) {
                 console.warn(`No posts found for user ${userId}`);
-                continue; // Skip this user if the posts response is null
+                continue;
             }
 
             const postCount = postResponse.data.posts.length;
@@ -153,7 +153,7 @@ async function fetchUsers(token) {
 async function fetchPopularPosts(token) {
     try {
         console.log("Fetching users to retrieve posts...");
-        const userResponse = await axios.get('http://20.244.56.144/test/users', {
+        const userResponse = await axios.get(`${process.env.BASE_URL}/users`, {
             headers: { Authorization: `Bearer ${token}` }
         });
 
@@ -166,7 +166,7 @@ async function fetchPopularPosts(token) {
 
         for (const userId in users) {
             console.log(`Fetching posts for user ${userId}...`);
-            const postResponse = await axios.get(`http://20.244.56.144/test/users/${userId}/posts`, {
+            const postResponse = await axios.get(`${process.env.BASE_URL}/users/${userId}/posts`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
@@ -177,7 +177,7 @@ async function fetchPopularPosts(token) {
 
             for (const post of postResponse.data.posts) {
                 console.log(`Fetching comments for post ${post.id}...`);
-                const commentResponse = await axios.get(`http://20.244.56.144/test/posts/${post.id}/comments`, {
+                const commentResponse = await axios.get(`${process.env.BASE_URL}/posts/${post.id}/comments`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
 
@@ -203,19 +203,7 @@ async function fetchPopularPosts(token) {
     }
 }
 
-
-
-
-
-
-
-
-
-
-
-
-// API's are defined below
-
+// API Routes
 app.get('/users', async (req, res) => {
     try {
         const token = await getValidToken();
@@ -231,70 +219,20 @@ app.get('/users', async (req, res) => {
 app.get('/posts', async (req, res) => {
     try {
         const token = await getValidToken();
-
-        if (req.query.type === 'popular') {
-            if (postHeap.heap.length === 0) {
-                await fetchPopularPosts(token);
-            }
-
-            const sortedPosts = postHeap.heap.sort((a, b) => b.value - a.value);
-            const maxComments = sortedPosts[0]?.value || 0;
-            const mostPopularPosts = sortedPosts.filter(post => post.value === maxComments);
-
-            return res.json({ mostPopularPosts });
+        if (postHeap.heap.length === 0) {
+            await fetchPopularPosts(token);
         }
 
-        if (req.query.type === 'latest') {
-            if (postHeap.heap.length === 0) {
-                await fetchPopularPosts(token);
-            }
-            return res.json({ latestPosts: postHeap.getLatestN(5) });
-        }
+        const sortedPosts = postHeap.heap.sort((a, b) => b.value - a.value);
+        const maxComments = sortedPosts[0]?.value || 0;
+        const mostPopularPosts = sortedPosts.filter(post => post.value === maxComments);
 
-        // If the query type is neither 'popular' nor 'latest'
-        return res.status(400).json({ error: "Invalid request" });
-
+        res.json({ mostPopularPosts });
     } catch (error) {
         console.error('Error fetching posts:', error);
-        return res.status(500).json({ error: 'Error fetching posts' });
+        res.status(500).json({ error: 'Error fetching posts' });
     }
 });
-
-
-
-
-
-
-
-
-
-
-app.get('/create-user-heap', async (req, res) => {
-    try {
-        const token = await getValidToken();
-        await fetchUsers(token);
-        res.json({ message: 'User heap created successfully.' });
-    } catch (error) {
-        res.status(500).json({ error: 'Failed to create user heap.' });
-    }
-});
-
-
-
-
-
-
-
-app.get('/create-post-heap', async (req, res) => {
-    try {
-        const token = await getValidToken();
-        await fetchPopularPosts(token);
-        res.json({ message: 'Post heap created successfully.' });
-    } catch (error) {
-        res.status(500).json({ error: 'Failed to create post heap.' });
-    }
-});
-
 
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
